@@ -1,120 +1,375 @@
-  
-  <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Image Resizer Tool</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background-color: #e6f0ff;
-      color: #003366;
-      margin: 0;
-      padding: 0;
-    }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ultimate Image Resizer · fixed</title>
 
-    .container {
-      max-width: 600px;
-      margin: 2rem auto;
-      padding: 1rem;
-      background-color: #ffffff;
-      border-radius: 10px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
-    }
+<!-- Sortable & JSZip (stable) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
-    h1 {
-      text-align: center;
-      color: #007bff;
-    }
-
-    input[type="file"], input[type="number"] {
-      display: block;
-      width: 100%;
-      margin: 1rem 0;
-      padding: 0.5rem;
-      border: 1px solid #ccc;
-      border-radius: 5px;
-    }
-
-    canvas {
-      max-width: 100%;
-      margin-top: 1rem;
-    }
-
-    button {
-      background-color: #007bff;
-      color: white;
-      padding: 0.7rem;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-      width: 100%;
-      margin-top: 1rem;
-    }
-
-    button:hover {
-      background-color: #0056b3;
-    }
-
-    @media (max-width: 600px) {
-      .container {
-        margin: 1rem;
-        padding: 1rem;
-      }
-    }
-  </style>
+<style>
+  *{box-sizing:border-box;font-family:'Segoe UI',Roboto,system-ui,sans-serif;}
+  body{margin:0;background:#edf2f9;display:flex;flex-direction:column;min-height:100vh;}
+  .header{background:#0a58ca;color:white;padding:1.2rem;text-align:center;font-size:1.8rem;font-weight:600;letter-spacing:0.5px;box-shadow:0 4px 12px rgba(0,0,0,0.1);}
+  .container{max-width:1200px;margin:30px auto;background:white;padding:30px;border-radius:24px;box-shadow:0 20px 40px rgba(0,0,0,0.08);flex:1;}
+  #drop{background:#f8fbff;border:3px dashed #0a58ca;border-radius:32px;padding:40px 20px;text-align:center;font-size:1.3rem;color:#0a58ca;font-weight:500;cursor:pointer;transition:0.2s;}
+  #drop:hover{background:#e1ecfe;border-color:#084298;}
+  .controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:20px;margin:30px 0 20px;}
+  .controls input,.controls select{padding:12px 15px;border-radius:40px;border:1.5px solid #dde2eb;font-size:1rem;background:white;transition:0.15s;}
+  .controls input:focus,.controls select:focus{border-color:#0a58ca;outline:none;box-shadow:0 0 0 4px rgba(10,88,202,0.15);}
+  .controls label{display:flex;align-items:center;gap:8px;background:#f2f5fa;border-radius:40px;padding:0 18px;font-weight:500;color:#1e293b;}
+  button{padding:12px 18px;border:none;border-radius:50px;font-weight:600;font-size:1rem;cursor:pointer;transition:0.15s;background:#eef2f6;}
+  button.primary{background:#0a58ca;color:white;box-shadow:0 6px 14px rgba(10,88,202,0.3);}
+  button.primary:hover{background:#0847a3;}
+  #downloadZip{width:100%;margin:20px 0 10px;padding:16px;font-size:1.2rem;background:#0a58ca;color:white;border-radius:60px;}
+  #preview{display:flex;flex-wrap:wrap;gap:22px;justify-content:center;margin-top:30px;}
+  .card{width:240px;background:#ffffff;border-radius:24px;padding:16px 16px 20px;position:relative;box-shadow:0 12px 30px rgba(0,0,0,0.06);border:1px solid #edf2f9;transition:transform 0.1s;}
+  .card:hover{box-shadow:0 18px 36px rgba(0,0,0,0.1);}
+  .card img{width:100%;height:170px;object-fit:contain;background:#f9fcff;border-radius:16px;border:1px solid #e9eef4;}
+  .remove{position:absolute;top:-10px;right:-10px;background:#dc3545;color:white;width:32px;height:32px;border-radius:50%;font-size:20px;line-height:1;display:flex;align-items:center;justify-content:center;border:2px solid white;font-weight:bold;}
+  .remove:hover{background:#b02a37;}
+  .info{font-size:13px;text-align:center;margin:12px 0 6px;color:#2c3e50;font-weight:500;background:#f8fafd;padding:6px;border-radius:40px;}
+  .warning{color:#b02a37;font-size:12px;text-align:center;margin:6px 0;background:#ffeaee;padding:4px 10px;border-radius:40px;}
+  .downloadSingle{background:#198754;color:white;border-radius:40px;padding:10px;width:100%;font-weight:600;margin-top:8px;}
+  .downloadSingle:hover{background:#146c43;}
+  .zoomBox{position:absolute;border:2px solid #0a58ca;display:none;pointer-events:none;}
+  .cropArea{position:absolute;border:2px dashed #f90;cursor:move;}
+  .lock-hint{color:#2c3e50;font-size:0.9rem;}
+</style>
 </head>
 <body>
-  <div class="container">
-    <h1>Image Resizer</h1>
-    <input type="file" id="upload" accept="image/*" />
-    <input type="number" id="width" placeholder="Width (px)" />
-    <input type="number" id="height" placeholder="Height (px)" />
-    <button onclick="resizeImage()">Resize Image</button>
-    <canvas id="canvas"></canvas>
-    <a id="downloadLink" style="display:none;" download="resized-image.png">Download Resized Image</a>
+
+<div class="header">🖼️ Ultimate Image Resizer · fixed & smooth</div>
+<div class="container">
+
+  <!-- hidden file input -->
+  <input type="file" id="fileInput" multiple accept="image/*" hidden>
+
+  <!-- drop zone -->
+  <div id="drop">📁 Drag & drop images here or click to select</div>
+
+  <!-- controls row -->
+  <div class="controls">
+    <input type="number" id="width" placeholder="Width px" value="800">
+    <input type="number" id="height" placeholder="Height px">
+    <label>
+      <input type="checkbox" id="lock" checked> 🔒 Lock ratio
+    </label>
+    <select id="format">
+      <option value="image/png">PNG (lossless)</option>
+      <option value="image/jpeg" selected>JPEG (high quality)</option>
+      <option value="image/webp">WebP (modern)</option>
+    </select>
   </div>
 
-  <script>
-    let originalImage = new Image();
+  <!-- main actions -->
+  <button id="downloadZip" class="primary">📦 Download all as ZIP</button>
 
-    document.getElementById('upload').addEventListener('change', function(event) {
-      const file = event.target.files[0];
-      if (!file) return;
+  <!-- preview grid -->
+  <div id="preview"></div>
 
+  <!-- (if no images) hint -->
+  <div style="text-align:center; color:#8899aa; margin-top:30px;" id="emptyHint">✨ uploaded images will appear here</div>
+</div>
+
+<script>
+(function() {
+  // ----- DOM elements -----
+  const drop = document.getElementById('drop');
+  const fileInput = document.getElementById('fileInput');
+  const preview = document.getElementById('preview');
+  const emptyHint = document.getElementById('emptyHint');
+  const widthInput = document.getElementById('width');
+  const heightInput = document.getElementById('height');
+  const lockCheck = document.getElementById('lock');
+  const formatSelect = document.getElementById('format');
+  const downloadZipBtn = document.getElementById('downloadZip');
+
+  // ----- state & helpers -----
+  let processingQueue = 0; // optional, not strictly needed
+
+  // Hide empty hint when cards exist
+  function toggleEmptyHint() {
+    if (!emptyHint) return;
+    const cards = preview.querySelectorAll('.card');
+    emptyHint.style.display = cards.length === 0 ? 'block' : 'none';
+  }
+
+  // ----- core resize function (returns blob, url, dimensions) -----
+  async function generateResizedBlob(file) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
       const reader = new FileReader();
-      reader.onload = function(e) {
-        originalImage.src = e.target.result;
+
+      reader.onload = (e) => {
+        img.src = e.target.result;
       };
+      reader.onerror = reject;
+
+      img.onload = () => {
+        try {
+          let targetW = parseInt(widthInput.value) || img.naturalWidth;
+          let targetH = parseInt(heightInput.value) || img.naturalHeight;
+          const lock = lockCheck.checked;
+          const mimeType = formatSelect.value; // e.g. 'image/jpeg'
+
+          // Auto‑adjust when one dimension missing & lock enabled
+          if (lock) {
+            if (widthInput.value && !heightInput.value) {
+              targetH = Math.round(img.naturalHeight * (targetW / img.naturalWidth));
+            } else if (heightInput.value && !widthInput.value) {
+              targetW = Math.round(img.naturalWidth * (targetH / img.naturalHeight));
+            }
+          }
+
+          // ensure positive integers (minimum 1px)
+          targetW = Math.max(1, Math.round(targetW));
+          targetH = Math.max(1, Math.round(targetH));
+
+          // draw canvas
+          const canvas = document.createElement('canvas');
+          canvas.width = targetW;
+          canvas.height = targetH;
+          const ctx = canvas.getContext('2d');
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
+          ctx.drawImage(img, 0, 0, targetW, targetH);
+
+          // convert to blob with quality 0.95 for lossy formats (ignored by PNG)
+          canvas.toBlob((blob) => {
+            if (!blob) return reject(new Error('Canvas to blob failed'));
+            resolve({
+              blob: blob,
+              url: URL.createObjectURL(blob),
+              width: targetW,
+              height: targetH,
+              sizeKB: (blob.size / 1024).toFixed(1)
+            });
+          }, mimeType, 0.95);
+        } catch (err) {
+          reject(err);
+        }
+      };
+      img.onerror = reject;
       reader.readAsDataURL(file);
     });
+  }
 
-    function resizeImage() {
-      const width = parseInt(document.getElementById('width').value);
-      const height = parseInt(document.getElementById('height').value);
-      const canvas = document.getElementById('canvas');
-      const ctx = canvas.getContext('2d');
+  // ----- update a single card (re‑render resized version) -----
+  async function updateCard(card) {
+    if (!card.file) return;
+    try {
+      const result = await generateResizedBlob(card.file);
 
-      if (!width || !height || isNaN(width) || isNaN(height)) {
-        alert("Please enter valid width and height.");
-        return;
+      // update image
+      const imgEl = card.querySelector('.card-img');
+      if (imgEl) imgEl.src = result.url;
+
+      // update info line
+      const infoEl = card.querySelector('.info');
+      if (infoEl) {
+        infoEl.innerText = `${result.width} × ${result.height}  |  ${result.sizeKB} KB`;
       }
 
-      canvas.width = width;
-      canvas.height = height;
+      // quality warning
+      const warnEl = card.querySelector('.warning');
+      if (warnEl) {
+        if (result.width < 50 || result.height < 50) {
+          warnEl.innerText = '⚠️ very small size may lose quality';
+        } else {
+          warnEl.innerText = '';
+        }
+      }
 
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(originalImage, 0, 0, width, height);
-
-      const downloadLink = document.getElementById('downloadLink');
-      downloadLink.href = canvas.toDataURL();
-      downloadLink.style.display = 'block';
-      downloadLink.textContent = 'Download Resized Image';
+      // store latest blob url for download (avoid re-compute later if needed)
+      card.__lastResult = result; // optional cache
+    } catch (err) {
+      console.warn('update failed', err);
+      const warnEl = card.querySelector('.warning');
+      if (warnEl) warnEl.innerText = '⚠️ processing error';
     }
-  </script>
+  }
+
+  // ----- download single image (use current settings) -----
+  async function downloadOne(card) {
+    if (!card.file) return;
+    try {
+      const result = await generateResizedBlob(card.file);
+      const a = document.createElement('a');
+      a.href = result.url;
+      // extract extension from mime
+      const ext = formatSelect.value.split('/')[1] || 'jpg';
+      a.download = `image_${Date.now()}.${ext}`;
+      a.click();
+      // optional: revoke later
+      setTimeout(() => URL.revokeObjectURL(result.url), 100);
+    } catch (err) {
+      alert('Download failed');
+    }
+  }
+
+  // ----- create card from file -----
+  function createCard(file) {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.file = file; // store file reference
+
+    // inner structure
+    card.innerHTML = `
+      <button class="remove" title="remove image">×</button>
+      <img class="card-img" src="" alt="preview">
+      <div class="info">⌛ processing...</div>
+      <div class="warning"></div>
+      <button class="downloadSingle">⬇️ Download</button>
+    `;
+
+    // attach events
+    const removeBtn = card.querySelector('.remove');
+    removeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      card.remove();
+      toggleEmptyHint();
+      // optional revoke object URLs inside img later? not necessary
+    });
+
+    const downloadBtn = card.querySelector('.downloadSingle');
+    downloadBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      downloadOne(card);
+    });
+
+    preview.appendChild(card);
+    toggleEmptyHint();
+
+    // start async update (resize preview)
+    updateCard(card).catch(e => console.warn);
+    return card;
+  }
+
+  // ----- handle dropped / selected files -----
+  function handleFiles(fileList) {
+    const files = Array.from(fileList).filter(f => f.type.startsWith('image/'));
+    if (files.length === 0) {
+      alert('only image files are supported');
+      return;
+    }
+    files.forEach(file => createCard(file));
+  }
+
+  // ----- event listeners -----
+  drop.addEventListener('click', () => fileInput.click());
+
+  drop.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    drop.style.background = '#d9e9ff';
+    drop.style.borderColor = '#0a58ca';
+  });
+  drop.addEventListener('dragleave', () => {
+    drop.style.background = '#f8fbff';
+    drop.style.borderColor = '#0a58ca';
+  });
+  drop.addEventListener('drop', (e) => {
+    e.preventDefault();
+    drop.style.background = '#f8fbff';
+    if (e.dataTransfer.files) handleFiles(e.dataTransfer.files);
+  });
+
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files) handleFiles(fileInput.files);
+    fileInput.value = ''; // allow re-upload same files
+  });
+
+  // global re-preview on any input change (width, height, lock, format)
+  [widthInput, heightInput, lockCheck, formatSelect].forEach(el => {
+    el.addEventListener('input', () => {
+      const cards = preview.querySelectorAll('.card');
+      cards.forEach(card => updateCard(card));
+    });
+    // also trigger for checkbox change
+    if (el.type === 'checkbox') {
+      el.addEventListener('change', () => {
+        const cards = preview.querySelectorAll('.card');
+        cards.forEach(card => updateCard(card));
+      });
+    }
+  });
+
+  // init sortable (with handle on whole card? keep simple)
+  new Sortable(preview, {
+    animation: 200,
+    ghostClass: 'sortable-ghost',
+    dragClass: 'sortable-drag',
+    onEnd: toggleEmptyHint // just refresh, no data change
+  });
+
+  // zip all
+  downloadZipBtn.addEventListener('click', async () => {
+    const cards = preview.querySelectorAll('.card');
+    if (cards.length === 0) {
+      alert('No images to zip');
+      return;
+    }
+
+    downloadZipBtn.disabled = true;
+    downloadZipBtn.innerText = '🔄 creating archive...';
+
+    try {
+      const zip = new JSZip();
+      const folder = zip.folder('resized_images');
+
+      for (let i = 0; i < cards.length; i++) {
+        const card = cards[i];
+        if (!card.file) continue;
+        // regenerate with current settings to ensure up‑to‑date blob
+        const result = await generateResizedBlob(card.file);
+        const ext = formatSelect.value.split('/')[1] || 'bin';
+        const filename = `image_${i+1}.${ext}`;
+        folder.file(filename, result.blob);
+      }
+
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(zipBlob);
+      link.download = 'resized-images.zip';
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(link.href), 200);
+    } catch (err) {
+      alert('ZIP creation failed: ' + err.message);
+    } finally {
+      downloadZipBtn.disabled = false;
+      downloadZipBtn.innerText = '📦 Download all as ZIP';
+    }
+  });
+
+  // initial hint hidden by css (we'll show if no cards)
+  toggleEmptyHint();
+
+  // (optional) add small sample image note - but no auto load.
+  // prefill width & height as placeholder
+  widthInput.placeholder = 'auto';
+  heightInput.placeholder = 'auto';
+
+  // Fix: originally the script missed some variable definitions (lock, format etc).
+  // everything is correctly scoped now.
+  // Also removed unused crop/zoom leftover.
+
+  // Edge: if user removes all cards, empty hint appears.
+  // MutationObserver for safety? but we call toggle on remove.
+  const observer = new MutationObserver(() => toggleEmptyHint());
+  observer.observe(preview, { childList: true, subtree: false });
+
+  console.log('Ultimate Resizer ready — fixed missing refs, stable.');
+})();
+</script>
+
+<!-- extra style for empty hint and sortable ghost -->
+<style>
+  .sortable-ghost { opacity: 0.4; background: #bcd3ff; border: 2px dashed #0a58ca; }
+  .sortable-drag { opacity: 0.8; transform: rotate(1deg); }
+  #emptyHint { display: block; color: #8a9fb0; font-size: 1.1rem; }
+</style>
+
 </body>
 </html>
-
-  
-  
